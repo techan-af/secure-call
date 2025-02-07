@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Phone, PhoneOff, UserCircle, X } from "lucide-react";
-
+import { Phone, PhoneOff, UserCircle } from "lucide-react";
 import io from "socket.io-client";
 
 const socket = io("https://secure-call.onrender.com");
@@ -15,8 +14,8 @@ export default function Home() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [callActive, setCallActive] = useState(false);
   const [recordingData, setRecordingData] = useState(null);
-  // isCaller indicates if this user initiated the call.
   const [isCaller, setIsCaller] = useState(false);
+  const [targetUser, setTargetUser] = useState(null); // For storing target user ID for caller
 
   const localStreamRef = useRef(null);
   const peerConnections = useRef({});
@@ -24,6 +23,9 @@ export default function Home() {
   const destination = useRef(null);
   const mediaRecorder = useRef(null);
   const recordedChunks = useRef([]);
+
+  // Use a basic STUN server configuration.
+  const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
   useEffect(() => {
     socket.emit("register-user", userId);
@@ -39,7 +41,7 @@ export default function Home() {
 
     socket.on("end-call", () => {
       console.log("Received end-call event from remote.");
-      endCall(false); // end without triggering upload if not caller
+      endCall(false); // End without triggering upload if not caller.
     });
 
     // Receive ICE candidates from remote peers.
@@ -53,18 +55,32 @@ export default function Home() {
       }
     });
 
+    // Handle call answered event (for caller).
+    socket.on("call-answered", async ({ answer }) => {
+      console.log("Received call answered event", answer);
+      if (targetUser) {
+        const pc = peerConnections.current[targetUser];
+        if (pc) {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          console.log("Set remote description on caller side.");
+        }
+      }
+    });
+
     return () => {
       socket.off("update-users");
       socket.off("incoming-call");
       socket.off("end-call");
       socket.off("ice-candidate");
+      socket.off("call-answered");
     };
-  }, [userId]);
+  }, [userId, targetUser]);
 
   // Initiate a call to a target user.
   const callUser = async (targetUserId) => {
     setIsCaller(true);
-    const peer = new RTCPeerConnection();
+    setTargetUser(targetUserId);
+    const peer = new RTCPeerConnection(rtcConfig);
     // ICE candidate handling.
     peer.onicecandidate = (event) => {
       if (event.candidate) {
@@ -111,7 +127,7 @@ export default function Home() {
     if (!incomingCall) return;
     setIsCaller(false);
     const { callerId, offer } = incomingCall;
-    const peer = new RTCPeerConnection();
+    const peer = new RTCPeerConnection(rtcConfig);
     // ICE candidate handling.
     peer.onicecandidate = (event) => {
       if (event.candidate) {

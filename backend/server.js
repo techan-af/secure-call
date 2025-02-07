@@ -14,13 +14,13 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // --- Gemini AI Pipeline Function ---
 async function processWithGeminiAI(transcription) {
   try {
+    // (For production, store your API key securely in environment variables)
     const GEMINI_API_KEY = "AIzaSyCOSX_kqyRGqdjaCzA4gc_2LzxIigPAkC0";
     if (!GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is not defined in the environment.");
     }
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
     const prompt = `
       Try creating a meaningful sentence using both of these transcriptions that are en-US and en-IN:
       
@@ -34,7 +34,7 @@ async function processWithGeminiAI(transcription) {
     return refinedText;
   } catch (error) {
     console.error("Error processing with Gemini AI:", error);
-    // If Gemini returns a SAFETY error, return fallback text.
+    // Return fallback text if Gemini returns a SAFETY error.
     if (error.message && error.message.includes("SAFETY")) {
       return "Refined text unavailable due to safety filters.";
     }
@@ -43,7 +43,8 @@ async function processWithGeminiAI(transcription) {
 }
 
 // --- MongoDB Setup ---
-const MONGO_URI = "mongodb+srv://chetan95497:Chetan@rtc.5rtod.mongodb.net/?retryWrites=true&w=majority&appName=rtc";
+const MONGO_URI =
+  "mongodb+srv://chetan95497:Chetan@rtc.5rtod.mongodb.net/?retryWrites=true&w=majority&appName=rtc";
 mongoose
   .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("Connected to MongoDB"))
@@ -79,7 +80,7 @@ io.on("connection", (socket) => {
     io.emit("update-users", onlineUsers);
   });
 
-  // Forward a call request from caller to target user.
+  // Forward a call request (offer) from caller to target user.
   socket.on("call-user", ({ targetUserId, callerId, offer }) => {
     const targetSocketId = onlineUsers[targetUserId];
     if (targetSocketId) {
@@ -94,6 +95,7 @@ io.on("connection", (socket) => {
   socket.on("call-answer", ({ callerId, answer }) => {
     const callerSocketId = onlineUsers[callerId];
     if (callerSocketId) {
+      console.log(`Forwarding call answer from callee to ${callerId}`);
       io.to(callerSocketId).emit("call-answered", { answer });
     }
   });
