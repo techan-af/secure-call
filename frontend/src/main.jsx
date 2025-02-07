@@ -15,13 +15,13 @@ const isLocalhost = Boolean(
 
 function register(config) {
   if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
-    const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href);
+    const publicUrl = new URL("https://secure-call-nine.vercel.app/", window.location.href);
     if (publicUrl.origin !== window.location.origin) {
       return;
     }
 
     window.addEventListener('load', () => {
-      const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
+      const swUrl = `https://secure-call-nine.vercel.app/service-worker.js`;
 
       if (isLocalhost) {
         // Check if a service worker exists on localhost.
