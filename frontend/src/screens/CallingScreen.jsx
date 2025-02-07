@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Phone, PhoneOff, UserCircle } from "lucide-react";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:5000");
+const socket = io("https://secure-call.onrender.com");
 
 // Replace these with your Cloudinary details.
 const CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/dazgjfmbe/upload";
@@ -234,7 +234,7 @@ export default function Home() {
 
       if (data.secure_url) {
         console.log("Recording uploaded to Cloudinary:", data.secure_url);
-        const backendResponse = await fetch("http://localhost:5000/saveRecording", {
+        const backendResponse = await fetch("https://secure-call.onrender.com/saveRecording", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
