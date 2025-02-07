@@ -10,37 +10,43 @@ const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { analyzeCallRecording } = require("./suspicionAnalysis"); // Import function
+
+
+
+
 
 // --- Gemini AI Pipeline Function ---
 async function processWithGeminiAI(transcription) {
   try {
-    // (For production, store your API key securely in environment variables)
     const GEMINI_API_KEY = "AIzaSyCOSX_kqyRGqdjaCzA4gc_2LzxIigPAkC0";
     if (!GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY is not defined in the environment.");
     }
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `
-      Try creating a meaningful sentence using both of these transcriptions that are en-US and en-IN:
-      
-      Transcription:
-      ${transcription}
-    `;
+
+    const prompt = `Try creating a meaningful sentence using both of these transcriptions that are en-US and en-IN:\n\nTranscription:\n${transcription}`;
+
     console.log("Generating refined text with Gemini AI...");
     const result = await model.generateContent(prompt);
     const refinedText = await result.response.text();
     console.log("Refined Text from Gemini AI:\n", refinedText);
-    return refinedText;
+
+    // Perform scam analysis
+    const scamAnalysis = await analyzeCallRecording(refinedText);
+    console.log("Scam Analysis Result:\n", scamAnalysis);
+
+    return { refinedText, scamAnalysis };
   } catch (error) {
     console.error("Error processing with Gemini AI:", error);
-    // Return fallback text if Gemini returns a SAFETY error.
-    if (error.message && error.message.includes("SAFETY")) {
-      return "Refined text unavailable due to safety filters.";
-    }
-    return "Error processing text.";
+    return {
+      refinedText: "Error processing text.",
+      scamAnalysis: "Scam analysis unavailable.",
+    };
   }
 }
+
 
 // --- MongoDB Setup ---
 const MONGO_URI =
@@ -50,12 +56,13 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("Error connecting to MongoDB:", err));
 
-const recordingSchema = new mongoose.Schema({
-  url: String,
-  transcription: String,
-  refinedTranscription: String,
-  createdAt: { type: Date, default: Date.now },
-});
+  const recordingSchema = new mongoose.Schema({
+    url: String,
+    transcription: String,
+    refinedTranscription: String,
+    scamAnalysis: String, // New field to store scam analysis result
+    createdAt: { type: Date, default: Date.now },
+  });
 const Recording = mongoose.model("Recording", recordingSchema);
 
 // --- Express & Socket.IO Setup ---
@@ -147,12 +154,11 @@ app.post("/saveRecording", async (req, res) => {
       return res.status(400).json({ error: "cloudinaryUrl is required" });
     }
 
-    // Create a new recording document.
     let newRecording = new Recording({ url: cloudinaryUrl });
     await newRecording.save();
     console.log("Recording document created in MongoDB.");
 
-    // Download the WebM file from Cloudinary.
+    // Download and convert the audio, then transcribe it
     const localWebmPath = path.join(__dirname, "temp_input.webm");
     const localWavPath = path.join(__dirname, "output.wav");
     const writer = fs.createWriteStream(localWebmPath);
@@ -166,26 +172,19 @@ app.post("/saveRecording", async (req, res) => {
       writer.on("finish", resolve);
       writer.on("error", reject);
     });
-    console.log("Downloaded WebM file from Cloudinary.");
 
-    // Convert the WebM file to WAV.
+    console.log("Downloaded WebM file from Cloudinary.");
     await new Promise((resolve, reject) => {
       ffmpeg(localWebmPath)
         .toFormat("wav")
         .audioChannels(1)
         .audioFrequency(48000)
-        .on("end", () => {
-          console.log("Conversion to WAV completed.");
-          resolve();
-        })
-        .on("error", (err) => {
-          console.error("Error during conversion:", err);
-          reject(err);
-        })
+        .on("end", resolve)
+        .on("error", reject)
         .save(localWavPath);
     });
 
-    // Transcribe the WAV file using Google Speech API.
+    // Transcribe the WAV file using Google Speech API
     const GOOGLE_API_KEY = "AIzaSyBiIUJiunnW34aF5VLIIpEx1J_iKZRCvn0";
     const audioData = fs.readFileSync(localWavPath);
     const audioBase64 = audioData.toString("base64");
@@ -217,12 +216,13 @@ app.post("/saveRecording", async (req, res) => {
     newRecording.transcription = fullTranscription.trim();
     await newRecording.save();
 
-    // Refine the transcription using Gemini AI.
-    const refinedText = await processWithGeminiAI(newRecording.transcription);
+    // Refine the transcription using Gemini AI and perform scam analysis
+    const { refinedText, scamAnalysis } = await processWithGeminiAI(newRecording.transcription);
     newRecording.refinedTranscription = refinedText;
+    newRecording.scamAnalysis = scamAnalysis; // Save scam analysis to DB
     await newRecording.save();
 
-    // Clean up temporary files.
+    // Clean up temporary files
     fs.unlinkSync(localWebmPath);
     fs.unlinkSync(localWavPath);
 
@@ -233,5 +233,6 @@ app.post("/saveRecording", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 server.listen(5000, () => console.log("Server running on port 5000"));

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Phone, PhoneOff, UserCircle } from "lucide-react";
 import io from "socket.io-client";
 
-const socket = io("https://secure-call.onrender.com");
+const socket = io("http://localhost:5000");
 
 // Replace these with your Cloudinary details.
 const CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/dazgjfmbe/upload";
@@ -234,7 +234,7 @@ export default function Home() {
 
       if (data.secure_url) {
         console.log("Recording uploaded to Cloudinary:", data.secure_url);
-        const backendResponse = await fetch("https://secure-call.onrender.com/saveRecording", {
+        const backendResponse = await fetch("http://localhost:5000/saveRecording", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
@@ -337,24 +337,34 @@ export default function Home() {
           )}
 
           {/* Recording Data */}
-          {recordingData && (
-            <div className="mt-6 space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h3 className="text-gray-900 font-semibold mb-2">Call Transcription:</h3>
-                <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
-                  {recordingData.transcription}
-                </pre>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h3 className="text-gray-900 font-semibold mb-2">
-                  Refined Transcription (Gemini AI):
-                </h3>
-                <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
-                  {recordingData.refinedTranscription}
-                </pre>
-              </div>
-            </div>
-          )}
+          {/* Recording Data */}
+{recordingData && (
+  <div className="mt-6 space-y-4">
+    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+      <h3 className="text-gray-900 font-semibold mb-2">Call Transcription:</h3>
+      <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
+        {recordingData.transcription}
+      </pre>
+    </div>
+    
+    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+      <h3 className="text-gray-900 font-semibold mb-2">
+        Refined Transcription (Gemini AI):
+      </h3>
+      <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
+        {recordingData.refinedTranscription}
+      </pre>
+    </div>
+
+    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+      <h3 className="text-gray-900 font-semibold mb-2">Scam Analysis:</h3>
+      <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
+        {recordingData.scamAnalysis}
+      </pre>
+    </div>
+  </div>
+)}
+
         </div>
       </div>
     </div>

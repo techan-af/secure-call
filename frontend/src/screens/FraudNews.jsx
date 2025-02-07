@@ -6,16 +6,20 @@ export default function FraudNews() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+
+  const YOUR_API_KEY =  "5c84b1019b2075ccf6f12b8df353dd0f";
+
   useEffect(() => {
     const fetchNews = async () => {
       try {
         const response = await fetch(
-          `https://newsapi.org/v2/everything?q="digital arrest"&language=en&sortBy=publishedAt&apiKey=ea94c9fb87c043d099f5860641565618`
+          `https://gnews.io/api/v4/search?q=%22digital%20fraud%22&lang=en&country=us&max=10&apikey=${YOUR_API_KEY}`
+
         );
         const data = await response.json();
 
         if (data.articles) {
-          setNews(data.articles.slice(0, 10));
+          setNews(data.articles);
         } else {
           setError("No articles found.");
         }
