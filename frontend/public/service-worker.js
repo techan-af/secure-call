@@ -3,7 +3,7 @@
 const CACHE_NAME = 'rtccall-cache-v1';
 const urlsToCache = [
   '/',
-  '/index.html',
+  '../index.html',
   '/manifest.json',
   '/callpng.png'
   // Add additional assets (CSS, JS bundles, etc.) as needed.
