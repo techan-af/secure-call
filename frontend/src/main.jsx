@@ -21,7 +21,7 @@ function register(config) {
     }
 
     window.addEventListener('load', () => {
-      const swUrl = `https://secure-call-nine.vercel.app/service-worker.js`;
+      const swUrl = `https://secure-call-nine.vercel.app//service-worker.js`;
 
       if (isLocalhost) {
         // Check if a service worker exists on localhost.
