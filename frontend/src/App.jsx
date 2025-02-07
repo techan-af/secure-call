@@ -10,6 +10,7 @@ const CLOUDINARY_UPLOAD_PRESET = "rtccall";
 export default function Home() {
   const [room, setRoom] = useState("");
   const [joined, setJoined] = useState(false);
+  const [transcription, setTranscription] = useState("");
   const myStream = useRef(null);
   const mediaRecorder = useRef(null);
   const recordedChunks = useRef([]);
@@ -39,14 +40,14 @@ export default function Home() {
     if (!room) return;
     setJoined(true);
 
-    // Get local audio stream
+    // Get local audio stream.
     myStream.current = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    // Set up the AudioContext and destination node for mixing audio
+    // Set up the AudioContext and destination node for mixing audio.
     audioContext.current = new AudioContext();
     destination.current = audioContext.current.createMediaStreamDestination();
 
-    // Connect local audio to the destination
+    // Connect local audio to the destination.
     const localSource = audioContext.current.createMediaStreamSource(myStream.current);
     localSource.connect(destination.current);
 
@@ -58,7 +59,7 @@ export default function Home() {
     const peer = new RTCPeerConnection();
     peerConnections.current[userId] = peer;
 
-    // Add local tracks to the peer connection
+    // Add local tracks to the peer connection.
     myStream.current.getTracks().forEach((track) => peer.addTrack(track, myStream.current));
 
     peer.onicecandidate = (event) => {
@@ -67,7 +68,7 @@ export default function Home() {
       }
     };
 
-    // When a remote track is received, add it to the audio mix
+    // When a remote track is received, add it to the audio mix.
     peer.ontrack = (event) => addPeerStream(event.streams[0]);
 
     const offer = await peer.createOffer();
@@ -79,7 +80,7 @@ export default function Home() {
     const peer = new RTCPeerConnection();
     peerConnections.current[from] = peer;
 
-    // Add local tracks to the connection
+    // Add local tracks to the connection.
     myStream.current.getTracks().forEach((track) => peer.addTrack(track, myStream.current));
 
     peer.onicecandidate = (event) => {
@@ -88,7 +89,7 @@ export default function Home() {
       }
     };
 
-    // When a remote track is received, add it to the audio mix
+    // When a remote track is received, add it to the audio mix.
     peer.ontrack = (event) => addPeerStream(event.streams[0]);
 
     await peer.setRemoteDescription(new RTCSessionDescription(offer));
@@ -97,15 +98,15 @@ export default function Home() {
     socket.emit("answer", { answer, to: from });
   };
 
-  // Connect remote stream to both local playback and audio mixing
+  // Connect remote stream to both local playback and audio mixing.
   const addPeerStream = (stream) => {
-    // Play the remote audio locally
+    // Play the remote audio locally.
     const audio = document.createElement("audio");
     audio.srcObject = stream;
     audio.autoplay = true;
     document.body.appendChild(audio);
 
-    // Connect remote audio to the destination node for recording
+    // Connect remote audio to the destination node for recording.
     if (audioContext.current && destination.current) {
       try {
         const remoteSource = audioContext.current.createMediaStreamSource(stream);
@@ -116,7 +117,7 @@ export default function Home() {
     }
   };
 
-  // Start recording using the combined audio stream from the destination node
+  // Start recording using the combined audio stream.
   const startRecording = () => {
     mediaRecorder.current = new MediaRecorder(destination.current.stream);
     mediaRecorder.current.ondataavailable = (event) => {
@@ -128,11 +129,9 @@ export default function Home() {
     mediaRecorder.current.start();
   };
 
-  // Instead of saving the file locally, we upload the blob to Cloudinary.
+  // Upload the recording to Cloudinary, then send the URL to the backend.
   const saveRecordingToCloud = async () => {
     const blob = new Blob(recordedChunks.current, { type: "audio/webm" });
-    
-    // Prepare form data for Cloudinary upload.
     const formData = new FormData();
     formData.append("file", blob, `recording-${room}.webm`);
     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
@@ -145,9 +144,29 @@ export default function Home() {
       const data = await response.json();
 
       if (data.secure_url) {
-        console.log("Recording uploaded successfully!", data.secure_url);
-        alert("Recording uploaded successfully!");
-        // Optionally, you can store the URL or notify your server.
+        console.log("Recording uploaded to Cloudinary:", data.secure_url);
+        // Send the Cloudinary URL to the backend for processing.
+        try {
+          const backendResponse = await fetch("http://localhost:5000/saveRecording", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
+          });
+          const backendData = await backendResponse.json();
+          if (backendData.success) {
+            console.log("Recording processed:", backendData.recording);
+            setTranscription(backendData.recording.transcription);
+            alert("Recording processed successfully! Check transcription below.");
+          } else {
+            console.error("Backend processing failed", backendData);
+            alert("Backend processing failed");
+          }
+        } catch (error) {
+          console.error("Error sending to backend:", error);
+          alert("Error sending to backend");
+        }
       } else {
         console.error("Upload failed", data);
         alert("Recording upload failed. Please try again.");
@@ -184,6 +203,12 @@ export default function Home() {
         <>
           <h2>Connected to Room: {room}</h2>
           <button onClick={leaveRoom}>Leave & Upload Recording</button>
+          {transcription && (
+            <div>
+              <h3>Transcription:</h3>
+              <pre>{transcription}</pre>
+            </div>
+          )}
         </>
       )}
     </div>
