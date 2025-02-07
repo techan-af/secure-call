@@ -79,6 +79,7 @@ io.on("connection", (socket) => {
     io.emit("update-users", onlineUsers);
   });
 
+  // Forward a call request from caller to target user.
   socket.on("call-user", ({ targetUserId, callerId, offer }) => {
     const targetSocketId = onlineUsers[targetUserId];
     if (targetSocketId) {
@@ -89,6 +90,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Forward call answer back to caller.
   socket.on("call-answer", ({ callerId, answer }) => {
     const callerSocketId = onlineUsers[callerId];
     if (callerSocketId) {
@@ -96,6 +98,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Forward call-declined event.
   socket.on("call-declined", ({ callerId }) => {
     const callerSocketId = onlineUsers[callerId];
     if (callerSocketId) {
@@ -103,6 +106,16 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Forward ICE candidates between peers.
+  socket.on("ice-candidate", ({ targetUserId, candidate, from }) => {
+    const targetSocketId = onlineUsers[targetUserId];
+    if (targetSocketId) {
+      console.log(`Forwarding ICE candidate from ${from} to ${targetUserId}`);
+      io.to(targetSocketId).emit("ice-candidate", { candidate, from });
+    }
+  });
+
+  // When one side ends the call, forward the event.
   socket.on("end-call", ({ otherUserId }) => {
     const targetSocketId = onlineUsers[otherUserId];
     if (targetSocketId) {
