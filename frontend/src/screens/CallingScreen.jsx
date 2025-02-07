@@ -8,28 +8,37 @@ const socket = io("https://secure-call.onrender.com");
 const CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/dazgjfmbe/upload";
 const CLOUDINARY_UPLOAD_PRESET = "rtccall";
 
+// Use a STUN server configuration.
+const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
 export default function Home() {
   const [userId, setUserId] = useState("user_" + Math.floor(Math.random() * 1000));
   const [onlineUsers, setOnlineUsers] = useState({});
   const [incomingCall, setIncomingCall] = useState(null);
   const [callActive, setCallActive] = useState(false);
-  const [recordingData, setRecordingData] = useState(null);
+  // recordingData will accumulate transcripts from each chunk.
+  const [recordingData, setRecordingData] = useState({ transcription: "", refinedTranscription: "" });
+  // isCaller indicates if this user initiated the call.
   const [isCaller, setIsCaller] = useState(false);
-  const [targetUser, setTargetUser] = useState(null); // For storing target user ID for caller
+  // For caller, store the target user's ID.
+  const [targetUser, setTargetUser] = useState(null);
 
   const localStreamRef = useRef(null);
   const peerConnections = useRef({});
   const audioContext = useRef(null);
   const destination = useRef(null);
   const mediaRecorder = useRef(null);
-  const recordedChunks = useRef([]);
 
-  // Use a basic STUN server configuration.
-  const rtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-
+  // Send heartbeat every 5 seconds.
   useEffect(() => {
     socket.emit("register-user", userId);
+    const heartbeatInterval = setInterval(() => {
+      socket.emit("heartbeat", userId);
+    }, 5000);
+    return () => clearInterval(heartbeatInterval);
+  }, [userId]);
 
+  useEffect(() => {
     socket.on("update-users", (users) => {
       setOnlineUsers(users);
     });
@@ -41,7 +50,7 @@ export default function Home() {
 
     socket.on("end-call", () => {
       console.log("Received end-call event from remote.");
-      endCall(false); // End without triggering upload if not caller.
+      endCall(false); // end without triggering upload if not caller.
     });
 
     // Receive ICE candidates from remote peers.
@@ -76,6 +85,59 @@ export default function Home() {
     };
   }, [userId, targetUser]);
 
+  // Function to process an audio chunk.
+  const processChunk = async (chunkBlob) => {
+    console.log("Processing chunk...");
+    const formData = new FormData();
+    formData.append("file", chunkBlob, `chunk-${userId}.webm`);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    try {
+      const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      console.log("Cloudinary response for chunk:", data);
+      if (data.secure_url) {
+        const backendResponse = await fetch("https://secure-call.onrender.com/processChunk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
+        });
+        const backendData = await backendResponse.json();
+        if (backendData.success) {
+          // Append new transcript data.
+          setRecordingData((prev) => ({
+            transcription: prev.transcription + "\n" + backendData.transcript,
+            refinedTranscription: prev.refinedTranscription + "\n" + backendData.refinedTranscript,
+          }));
+          console.log("Chunk processed successfully:", backendData);
+        } else {
+          console.error("Backend chunk processing failed", backendData);
+        }
+      } else {
+        console.error("Chunk upload failed", data);
+      }
+    } catch (error) {
+      console.error("Error processing chunk:", error);
+    }
+  };
+
+  // Start recording in 15-second chunks.
+  const startRecording = () => {
+    if (destination.current) {
+      mediaRecorder.current = new MediaRecorder(destination.current.stream);
+      mediaRecorder.current.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          processChunk(event.data);
+        }
+      };
+      // Start recording with a timeslice of 15000ms (15 seconds)
+      mediaRecorder.current.start(15000);
+      console.log("Recording started with 15-second timeslice...");
+    }
+  };
+
   // Initiate a call to a target user.
   const callUser = async (targetUserId) => {
     setIsCaller(true);
@@ -94,12 +156,20 @@ export default function Home() {
     };
     peerConnections.current[targetUserId] = peer;
 
-    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    let localStream;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error("Error accessing audio:", err);
+      alert("Unable to access microphone");
+      return;
+    }
     localStreamRef.current = localStream;
     localStream.getTracks().forEach((track) => peer.addTrack(track, localStream));
 
     // Set up audio mixing.
     audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+    await audioContext.current.resume();
     destination.current = audioContext.current.createMediaStreamDestination();
     const localAudioSource = audioContext.current.createMediaStreamSource(localStream);
     localAudioSource.connect(destination.current);
@@ -141,11 +211,19 @@ export default function Home() {
     };
     peerConnections.current[callerId] = peer;
 
-    const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    let localStream;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error("Error accessing audio:", err);
+      alert("Unable to access microphone");
+      return;
+    }
     localStreamRef.current = localStream;
     localStream.getTracks().forEach((track) => peer.addTrack(track, localStream));
 
     audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+    await audioContext.current.resume();
     destination.current = audioContext.current.createMediaStreamDestination();
     const localAudioSource = audioContext.current.createMediaStreamSource(localStream);
     localAudioSource.connect(destination.current);
@@ -177,23 +255,8 @@ export default function Home() {
     }
   };
 
-  // Start recording the mixed audio.
-  const startRecording = () => {
-    if (destination.current) {
-      mediaRecorder.current = new MediaRecorder(destination.current.stream);
-      mediaRecorder.current.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordedChunks.current.push(event.data);
-        }
-      };
-      mediaRecorder.current.start();
-      console.log("Recording started...");
-    }
-  };
-
-  // End the call. If triggerUpload is true and if this user is the caller, upload recording.
+  // End the call.
   const endCall = (triggerUpload = true) => {
-    // Send an end-call signal so the other side ends too.
     const otherUserId = Object.keys(peerConnections.current)[0];
     socket.emit("end-call", { otherUserId });
     setCallActive(false);
@@ -203,60 +266,8 @@ export default function Home() {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
     }
     if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
-      // Set the onstop handler before stopping.
-      mediaRecorder.current.onstop = () => {
-        console.log("MediaRecorder stopped. Recorded chunks:", recordedChunks.current);
-        if (triggerUpload && isCaller) {
-          uploadRecording();
-        } else {
-          console.log("Not triggering upload because user is not caller.");
-        }
-      };
-      mediaRecorder.current.stop();
+      mediaRecorder.current.stop(); // Final chunk will be processed by ondataavailable.
     }
-  };
-
-  // Upload the recording blob to Cloudinary and call the backend.
-  const uploadRecording = async () => {
-    console.log("Uploading recording...");
-    const blob = new Blob(recordedChunks.current, { type: "audio/webm" });
-    const formData = new FormData();
-    formData.append("file", blob, `recording-${userId}.webm`);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-    try {
-      const response = await fetch(CLOUDINARY_UPLOAD_URL, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      console.log("Cloudinary response:", data);
-
-      if (data.secure_url) {
-        console.log("Recording uploaded to Cloudinary:", data.secure_url);
-        const backendResponse = await fetch("https://secure-call.onrender.com/saveRecording", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
-        });
-        const backendData = await backendResponse.json();
-        if (backendData.success) {
-          console.log("Recording processed:", backendData.recording);
-          setRecordingData(backendData.recording);
-          alert("Recording processed successfully!");
-        } else {
-          console.error("Backend processing failed", backendData);
-          alert("Backend processing failed");
-        }
-      } else {
-        console.error("Upload failed", data);
-        alert("Recording upload failed. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error uploading recording:", error);
-      alert("Error uploading recording");
-    }
-    recordedChunks.current = [];
   };
 
   return (
@@ -336,35 +347,25 @@ export default function Home() {
             </div>
           )}
 
-          {/* Recording Data */}
-          {/* Recording Data */}
-{recordingData && (
-  <div className="mt-6 space-y-4">
-    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-      <h3 className="text-gray-900 font-semibold mb-2">Call Transcription:</h3>
-      <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
-        {recordingData.transcription}
-      </pre>
-    </div>
-    
-    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-      <h3 className="text-gray-900 font-semibold mb-2">
-        Refined Transcription (Gemini AI):
-      </h3>
-      <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
-        {recordingData.refinedTranscription}
-      </pre>
-    </div>
-
-    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-      <h3 className="text-gray-900 font-semibold mb-2">Scam Analysis:</h3>
-      <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
-        {recordingData.scamAnalysis}
-      </pre>
-    </div>
-  </div>
-)}
-
+          {/* Recording Data (Cumulative Transcript) */}
+          {(recordingData.transcription || recordingData.refinedTranscription) && (
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 className="text-gray-900 font-semibold mb-2">Call Transcription:</h3>
+                <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
+                  {recordingData.transcription}
+                </pre>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 className="text-gray-900 font-semibold mb-2">
+                  Refined Transcription (Gemini AI):
+                </h3>
+                <pre className="bg-white p-3 rounded-md text-sm text-gray-700 overflow-auto border border-gray-200">
+                  {recordingData.refinedTranscription}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
