@@ -208,43 +208,67 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Your ID: {userId}</h2>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-5">
+    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md shadow-lg">
+      <h2 className="text-xl font-bold text-center mb-4">Your ID: {userId}</h2>
 
-      <h3>Online Users:</h3>
-      <ul>
+      <h3 className="text-lg font-semibold mb-2">Online Users</h3>
+      <ul className="space-y-2">
         {Object.entries(onlineUsers)
           .filter(([id]) => id !== userId)
           .map(([id]) => (
-            <li key={id}>
-              {id} <button onClick={() => callUser(id)}>Call</button>
+            <li key={id} className="flex items-center justify-between bg-gray-700 p-2 rounded-md">
+              <span>{id}</span>
+              <button
+                onClick={() => callUser(id)}
+                className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded"
+              >
+                Call
+              </button>
             </li>
           ))}
       </ul>
 
       {incomingCall && (
-        <div style={{ border: "1px solid black", padding: 10, margin: 10 }}>
-          <h3>Incoming Call from {incomingCall.callerId}</h3>
-          <button onClick={answerCall}>Answer</button>
-          <button onClick={declineCall}>Decline</button>
+        <div className="mt-4 p-4 bg-red-500 rounded-lg shadow-md text-center">
+          <h3 className="text-white">Incoming Call from {incomingCall.callerId}</h3>
+          <button
+            onClick={answerCall}
+            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded m-2"
+          >
+            Answer
+          </button>
+          <button
+            onClick={declineCall}
+            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded"
+          >
+            Decline
+          </button>
         </div>
       )}
 
       {callActive && (
-        <div>
-          <h3>Call in progress...</h3>
-          <button onClick={() => endCall(true)}>End Call</button>
+        <div className="mt-4 p-4 bg-blue-500 rounded-lg shadow-md text-center">
+          <h3 className="text-white">Call in progress...</h3>
+          <button
+            onClick={() => endCall(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded mt-2"
+          >
+            End Call
+          </button>
         </div>
       )}
 
       {recordingData && (
-        <div>
-          <h3>Call Transcription:</h3>
-          <pre>{recordingData.transcription}</pre>
-          <h3>Refined Transcription (Gemini AI):</h3>
-          <pre>{recordingData.refinedTranscription}</pre>
+        <div className="mt-4 p-4 bg-gray-700 rounded-lg shadow-md text-left">
+          <h3 className="text-white font-semibold">Call Transcription:</h3>
+          <pre className="bg-gray-800 p-2 rounded-md text-sm overflow-auto">{recordingData.transcription}</pre>
+          <h3 className="text-white font-semibold mt-2">Refined Transcription (Gemini AI):</h3>
+          <pre className="bg-gray-800 p-2 rounded-md text-sm overflow-auto">{recordingData.refinedTranscription}</pre>
         </div>
       )}
     </div>
+  </div>
+
   );
 }
