@@ -1,4 +1,3 @@
-// index.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -10,11 +9,7 @@ const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { analyzeCallRecording } = require("./suspicionAnalysis"); // Import function
-
-
-
-
+const { analyzeCallRecording } = require("./suspicionAnalysis"); // Import your additional function if needed
 
 // --- Gemini AI Pipeline Function ---
 async function processWithGeminiAI(transcription) {
@@ -25,15 +20,13 @@ async function processWithGeminiAI(transcription) {
     }
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
     const prompt = `Try creating a meaningful sentence using both of these transcriptions that are en-US and en-IN:\n\nTranscription:\n${transcription}`;
-
     console.log("Generating refined text with Gemini AI...");
     const result = await model.generateContent(prompt);
     const refinedText = await result.response.text();
     console.log("Refined Text from Gemini AI:\n", refinedText);
 
-    // Perform scam analysis
+    // Perform scam analysis (if desired)
     const scamAnalysis = await analyzeCallRecording(refinedText);
     console.log("Scam Analysis Result:\n", scamAnalysis);
 
@@ -47,22 +40,20 @@ async function processWithGeminiAI(transcription) {
   }
 }
 
-
 // --- MongoDB Setup ---
-const MONGO_URI =
-  "mongodb+srv://chetan95497:Chetan@rtc.5rtod.mongodb.net/?retryWrites=true&w=majority&appName=rtc";
+const MONGO_URI = "mongodb+srv://chetan95497:Chetan@rtc.5rtod.mongodb.net/?retryWrites=true&w=majority&appName=rtc";
 mongoose
   .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("Error connecting to MongoDB:", err));
 
-  const recordingSchema = new mongoose.Schema({
-    url: String,
-    transcription: String,
-    refinedTranscription: String,
-    scamAnalysis: String, // New field to store scam analysis result
-    createdAt: { type: Date, default: Date.now },
-  });
+const recordingSchema = new mongoose.Schema({
+  url: String,
+  transcription: String,
+  refinedTranscription: String,
+  scamAnalysis: String, // To store scam analysis results
+  createdAt: { type: Date, default: Date.now },
+});
 const Recording = mongoose.model("Recording", recordingSchema);
 
 // --- Express & Socket.IO Setup ---
@@ -75,19 +66,26 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-// --- Direct Calling Signaling ---
-const onlineUsers = {};
+// --- Direct Calling Signaling & Heartbeat ---
+const onlineUsers = {}; // userId -> socket.id
+const lastPing = {};    // userId -> timestamp
 
 io.on("connection", (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
+  // Register the user.
   socket.on("register-user", (userId) => {
     onlineUsers[userId] = socket.id;
+    lastPing[userId] = Date.now();
     console.log("Online Users:", onlineUsers);
     io.emit("update-users", onlineUsers);
   });
 
-  // Forward a call request (offer) from caller to target user.
+  // Receive heartbeat pings from clients.
+  socket.on("heartbeat", (userId) => {
+    lastPing[userId] = Date.now();
+  });
+
   socket.on("call-user", ({ targetUserId, callerId, offer }) => {
     const targetSocketId = onlineUsers[targetUserId];
     if (targetSocketId) {
@@ -98,7 +96,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Forward call answer back to caller.
   socket.on("call-answer", ({ callerId, answer }) => {
     const callerSocketId = onlineUsers[callerId];
     if (callerSocketId) {
@@ -107,7 +104,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Forward call-declined event.
   socket.on("call-declined", ({ callerId }) => {
     const callerSocketId = onlineUsers[callerId];
     if (callerSocketId) {
@@ -115,7 +111,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Forward ICE candidates between peers.
   socket.on("ice-candidate", ({ targetUserId, candidate, from }) => {
     const targetSocketId = onlineUsers[targetUserId];
     if (targetSocketId) {
@@ -124,7 +119,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // When one side ends the call, forward the event.
   socket.on("end-call", ({ otherUserId }) => {
     const targetSocketId = onlineUsers[otherUserId];
     if (targetSocketId) {
@@ -134,10 +128,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    // Remove ALL keys whose value matches this socket's ID.
     for (const userId in onlineUsers) {
       if (onlineUsers[userId] === socket.id) {
         delete onlineUsers[userId];
-        break;
+        delete lastPing[userId];
       }
     }
     io.emit("update-users", onlineUsers);
@@ -145,7 +140,25 @@ io.on("connection", (socket) => {
   });
 });
 
-// --- Endpoint to Process and Save Recording ---
+// Periodically remove stale users that haven't sent a heartbeat in 30 seconds.
+setInterval(() => {
+  const now = Date.now();
+  const staleThreshold = 30000; // 30 seconds
+  let removed = false;
+  for (const userId in lastPing) {
+    if (now - lastPing[userId] > staleThreshold) {
+      console.log(`Removing stale user: ${userId}`);
+      delete onlineUsers[userId];
+      delete lastPing[userId];
+      removed = true;
+    }
+  }
+  if (removed) {
+    io.emit("update-users", onlineUsers);
+  }
+}, 10000); // every 10 seconds
+
+// --- Endpoint to Process and Save Recording (Full Call) ---
 app.post("/saveRecording", async (req, res) => {
   try {
     const { cloudinaryUrl } = req.body;
@@ -158,7 +171,6 @@ app.post("/saveRecording", async (req, res) => {
     await newRecording.save();
     console.log("Recording document created in MongoDB.");
 
-    // Download and convert the audio, then transcribe it
     const localWebmPath = path.join(__dirname, "temp_input.webm");
     const localWavPath = path.join(__dirname, "output.wav");
     const writer = fs.createWriteStream(localWebmPath);
@@ -179,12 +191,17 @@ app.post("/saveRecording", async (req, res) => {
         .toFormat("wav")
         .audioChannels(1)
         .audioFrequency(48000)
-        .on("end", resolve)
-        .on("error", reject)
+        .on("end", () => {
+          console.log("Conversion to WAV completed.");
+          resolve();
+        })
+        .on("error", (err) => {
+          console.error("Error during conversion:", err);
+          reject(err);
+        })
         .save(localWavPath);
     });
 
-    // Transcribe the WAV file using Google Speech API
     const GOOGLE_API_KEY = "AIzaSyBiIUJiunnW34aF5VLIIpEx1J_iKZRCvn0";
     const audioData = fs.readFileSync(localWavPath);
     const audioBase64 = audioData.toString("base64");
@@ -216,13 +233,13 @@ app.post("/saveRecording", async (req, res) => {
     newRecording.transcription = fullTranscription.trim();
     await newRecording.save();
 
-    // Refine the transcription using Gemini AI and perform scam analysis
+    // Refine transcription and perform scam analysis.
     const { refinedText, scamAnalysis } = await processWithGeminiAI(newRecording.transcription);
     newRecording.refinedTranscription = refinedText;
-    newRecording.scamAnalysis = scamAnalysis; // Save scam analysis to DB
+    newRecording.scamAnalysis = scamAnalysis;
     await newRecording.save();
 
-    // Clean up temporary files
+    // Clean up temporary files.
     fs.unlinkSync(localWebmPath);
     fs.unlinkSync(localWavPath);
 
@@ -234,5 +251,88 @@ app.post("/saveRecording", async (req, res) => {
   }
 });
 
+// --- Endpoint to Process a Recording Chunk (Incremental) ---
+app.post("/processChunk", async (req, res) => {
+  try {
+    const { cloudinaryUrl } = req.body;
+    console.log("Received /processChunk with URL:", cloudinaryUrl);
+    if (!cloudinaryUrl) {
+      return res.status(400).json({ error: "cloudinaryUrl is required" });
+    }
+
+    const localWebmPath = path.join(__dirname, "temp_chunk.webm");
+    const localWavPath = path.join(__dirname, "chunk_output.wav");
+    const writer = fs.createWriteStream(localWebmPath);
+    const response = await axios({
+      url: cloudinaryUrl,
+      method: "GET",
+      responseType: "stream",
+    });
+    response.data.pipe(writer);
+    await new Promise((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+    });
+    console.log("Downloaded chunk WebM file from Cloudinary.");
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(localWebmPath)
+        .toFormat("wav")
+        .audioChannels(1)
+        .audioFrequency(48000)
+        .on("end", () => {
+          console.log("Chunk conversion to WAV completed.");
+          resolve();
+        })
+        .on("error", (err) => {
+          console.error("Error during chunk conversion:", err);
+          reject(err);
+        })
+        .save(localWavPath);
+    });
+
+    const GOOGLE_API_KEY = "AIzaSyBiIUJiunnW34aF5VLIIpEx1J_iKZRCvn0";
+    const audioData = fs.readFileSync(localWavPath);
+    const audioBase64 = audioData.toString("base64");
+    const googleUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${GOOGLE_API_KEY}`;
+    const languages = ["en-US", "en-IN"];
+    let fullTranscription = "";
+
+    for (const lang of languages) {
+      console.log(`Transcribing chunk with language: ${lang}`);
+      const requestBody = {
+        config: { encoding: "LINEAR16", sampleRateHertz: 48000, languageCode: lang },
+        audio: { content: audioBase64 },
+      };
+
+      try {
+        const googleResponse = await axios.post(googleUrl, requestBody);
+        const transcription = googleResponse.data.results
+          ? googleResponse.data.results.map(result => result.alternatives[0].transcript).join(" ")
+          : "";
+        if (transcription) {
+          fullTranscription += `[${lang}] ${transcription}\n`;
+        }
+      } catch (error) {
+        console.error(`Error transcribing chunk with ${lang}:`, error.response?.data || error.message);
+      }
+    }
+
+    console.log("Final Chunk Transcription:\n", fullTranscription.trim());
+    const refinedText = await processWithGeminiAI(fullTranscription.trim());
+
+    fs.unlinkSync(localWebmPath);
+    fs.unlinkSync(localWavPath);
+
+    res.json({
+      success: true,
+      transcript: fullTranscription.trim(),
+      refinedTranscript: refinedText,
+    });
+  } catch (error) {
+    console.error("Error in /processChunk:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 server.listen(5000, () => console.log("Server running on port 5000"));
