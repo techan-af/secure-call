@@ -150,14 +150,13 @@ Before setting up the project, ensure you have the following installed:
 1. *Clone the Repository:*
 
 ```
-   git clone https://github.com/yourusername/secure-call.git
+   git clone https://github.com/techan-af/secure-call
    cd secure-call/backend
  ```  
 
 2. *Install Dependencies:*
 
 ```
-   bash
    npm install
   ``` 
 
@@ -176,7 +175,6 @@ Before setting up the project, ensure you have the following installed:
 4. *Start the Backend Server:*
 
 ```
-  
   node server.js
 ```
 
