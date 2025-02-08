@@ -146,10 +146,12 @@ Before setting up the project, ensure you have the following installed:
 ### Backend Setup
 
 1. *Clone the Repository:*
+
+```
    bash
    git clone https://github.com/yourusername/secure-call.git
    cd secure-call/backend
-   
+ ```  
 
 2. *Install Dependencies:*
    bash
