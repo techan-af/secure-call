@@ -100,7 +100,7 @@ The frontend, built with React, provides an intuitive interface featuring a bott
 ---
 
 ## Project Structure
-
+```
 SecureCall/
 │
 ├── lib/
@@ -128,7 +128,7 @@ SecureCall/
 │   └── resources/application.yml      # Spring Boot configuration (if applicable)
 │
 └── README.md                         # Project documentation
-
+```
 
 ---
 
