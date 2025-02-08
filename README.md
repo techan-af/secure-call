@@ -231,6 +231,8 @@ json
 
 
 Response Example:
+
+```
 json
 {
   "success": true,
@@ -243,7 +245,7 @@ json
     "createdAt": "timestamp"
   }
 }
-
+```
 
 ### POST /processChunk
 Description: Processes a 15-second audio chunk.
