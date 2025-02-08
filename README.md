@@ -148,48 +148,58 @@ Before setting up the project, ensure you have the following installed:
 1. *Clone the Repository:*
 
 ```
-   bash
    git clone https://github.com/yourusername/secure-call.git
    cd secure-call/backend
  ```  
 
 2. *Install Dependencies:*
+
+```
    bash
    npm install
-   
+  ``` 
 
 3. *Configure Environment Variables:*
    Create a .env file in the backend directory and add:
    
+```
    PORT=5000
    MONGO_URI=your_mongodb_uri
    CLOUDINARY_UPLOAD_URL=https://api.cloudinary.com/v1_1/your_cloud_name/upload
    CLOUDINARY_UPLOAD_PRESET=your_cloudinary_preset
    GOOGLE_API_KEY=your_google_speech_api_key
    GEMINI_API_KEY=your_gemini_ai_api_key
-   
+ ```  
 
 4. *Start the Backend Server:*
-   bash
-   npm start
-   
+
+```
+  
+  node server.js
+```
+
+
 
 ### Frontend Setup
 
 1. *Navigate to the Frontend Directory:*
-   bash
-   cd ../frontend
    
+```
+   cd ../frontend
+  ``` 
 
 2. *Install Dependencies:*
-   bash
-   npm install
    
 
+```
+   npm install
+```   
+
 3. *Start the Frontend Application:*
-   bash
+
+```
    npm start
-   
+  ``` 
 
 4. *Access the Application:*
    Open your browser and navigate to http://localhost:3000
