@@ -109,33 +109,27 @@ The frontend, built with React, provides an intuitive interface featuring a bott
 
 ## 📂  Project Structure
 ```
-SecureCall/
-│
-├── lib/
-│   ├── main.dart                   # Entry point of the Flutter app (if applicable)
-│   ├── screens/                     # Contains all screen widgets
-│   │   ├── calling_screen.dart       # WebRTC-based calling interface
-│   │   ├── call_logs.dart            # Call logs display
-│   │   ├── fraud_news.dart           # Fraud-related news and updates
-│   │   ├── scam_awareness.dart       # Scam detection and safety tips
-│   ├── widgets/                     # Reusable UI components (buttons, cards, etc.)
-│   └── services/                     # API and backend service integrations
-│
-├── assets/                          # Images and multilingual JSON files for localization
-│   ├── multilingual_assets/en.json
-│   ├── multilingual_assets/hi.json
-│   ├── multilingual_assets/mr.json
-│
-├── backend/                         # Backend service (Node.js/Express & Socket.IO)
+
+secure-call/
+├── backend/
+│   ├── server.js             # Main Express server & Socket.IO integration
+│   ├── suspicionAnalysis.js  # Module for scam analysis using Gemini AI
+│   ├── package.json          # Backend dependencies and scripts
+│   └── .env                  # Environment variables (not committed)
+├── frontend/
+│   ├── public/
 │   ├── src/
-│   │   ├── server.js                 # Main Express server & Socket.IO integration
-│   │   ├── suspicion_analysis.js      # Scam analysis using Gemini AI
-│   ├── package.json                  # Backend dependencies and scripts
-│   ├── .env                           # Environment variables (not committed)
-│   ├── src/main/java/                 # Java source files (if integrating Spring Boot)
-│   └── resources/application.yml      # Spring Boot configuration (if applicable)
-│
-└── README.md                         # Project documentation
+│   │   ├── App.jsx          # Main application and routing setup
+│   │   ├── screens/
+│   │   │   ├── CallingScreen.jsx    # WebRTC-based calling interface
+│   │   │   ├── CallLogs.jsx         # Call logs display
+│   │   │   ├── FraudNews.jsx        # Fraud-related news and updates
+│   │   │   └── ScamAwareness.jsx    # Scam detection and safety tips
+│   │   └── index.js         # Application entry point
+│   ├── package.json         # Frontend dependencies and scripts
+│   └── .env                 # Frontend environment configuration (if needed)
+└── README.md               # Project documentation
+
 ```
 
 ---
