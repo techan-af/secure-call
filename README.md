@@ -1,4 +1,4 @@
-# Secure Call
+#  🚀 Secure Call
 
 Secure Call is a real-time, secure voice calling application designed to facilitate peer-to-peer audio communication with enhanced security and scam detection features. This project integrates modern web technologies to record and process calls, transcribe audio in multiple languages, and utilize advanced AI (Gemini AI) to analyze call content for potential scam indicators.
 
@@ -9,20 +9,24 @@ Secure Call is a real-time, secure voice calling application designed to facilit
 
 
 
+---
+
 ## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture & Workflow](#architecture--workflow)
-- [Project Structure](#project-structure)
-- [Installation & Setup](#installation--setup)
-- [Usage](#usage)
-- [API Endpoints](#api-endpoints)
-- [Environment Variables](#environment-variables)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
+- [🔍 Overview](#overview)
+- [✨ Features](#features)
+- [🛠️ Tech Stack](#tech-stack)
+- [🔄 Architecture & Workflow](#architecture--workflow)
+- [📂 Project Structure](#project-structure)
+- [⚙️ Installation & Setup](#installation--setup)
+- [💡 Usage](#usage)
+- [📡 API Endpoints](#api-endpoints)
+- [🔑 Environment Variables](#environment-variables)
+- [🤝 Contributing](#contributing)
+- [📄 License](#license)
+- [🙏 Acknowledgments](#acknowledgments)
+
+---
 
 ## Overview
 
