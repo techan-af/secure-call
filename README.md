@@ -4,7 +4,8 @@ Secure Call is a real-time, secure voice calling application designed to facilit
 
 ## Architecture Diagram
 
-![image](https://github.com/user-attachments/assets/b795af4c-8700-445a-bd4f-f9b926abb950)
+![image](https://github.com/user-attachments/assets/cc3c76f3-1b1d-4658-8e16-f7ccc70769f5)
+
 
 
 
