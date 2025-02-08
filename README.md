@@ -22,13 +22,10 @@ Secure Call is a real-time, secure voice calling application designed to facilit
 - [💡 Usage](#usage)
 - [📡 API Endpoints](#api-endpoints)
 - [🔑 Environment Variables](#environment-variables)
-- [🤝 Contributing](#contributing)
-- [📄 License](#license)
-- [🙏 Acknowledgments](#acknowledgments)
 
 ---
 
-## Overview
+## 🔍  Overview
 
 Secure Call provides a secure platform for real-time voice communication. With an emphasis on user security and call integrity, the application:
 
@@ -39,7 +36,7 @@ Secure Call provides a secure platform for real-time voice communication. With a
 - Leverages *Google Generative AI (Gemini AI)* to refine transcriptions and perform an in-depth scam analysis based on a set of predefined scam detection flags
 - Persists call recordings and analysis results in *MongoDB*
 
-## Features
+## ✨ Features
 
 ### Real-Time Communication
 Secure voice calls between users are established using WebRTC with seamless signaling via Socket.IO.
@@ -59,7 +56,7 @@ Real-time updates on online users are maintained using heartbeat pings, ensuring
 ### Comprehensive UI
 The frontend, built with React, provides an intuitive interface featuring a bottom navigation for switching between screens (Call, Call Logs, Fraud News, Scam Awareness).
 
-## Tech Stack
+## 🛠️  Tech Stack
 
 ### Frontend
 - *React:* Library for building the user interface
@@ -79,7 +76,7 @@ The frontend, built with React, provides an intuitive interface featuring a bott
 - *Google Speech-to-Text API:* Service for transcribing audio recordings
 - *Google Generative AI (Gemini AI):* AI service for refining transcriptions and analyzing call content for scam indicators
 
-## Architecture & Workflow
+## 🔄  Architecture & Workflow
 
 1. *User Registration & Presence*
    - Each user is assigned a unique ID upon connection
@@ -110,7 +107,7 @@ The frontend, built with React, provides an intuitive interface featuring a bott
 
 ---
 
-## Project Structure
+## 📂  Project Structure
 ```
 SecureCall/
 │
@@ -143,7 +140,7 @@ SecureCall/
 
 ---
 
-## Installation & Setup
+## ⚙️ Installation & Setup
 
 ### Prerequisites
 
@@ -215,7 +212,7 @@ Before setting up the project, ensure you have the following installed:
 4. *Access the Application:*
    Open your browser and navigate to http://localhost:3000
 
-## Usage
+## 💡  Usage
 
 ### Initiating a Call
 Upon launching the app, you will see your unique user ID along with a list of online users. Click on the Call button next to a user's name to initiate a call.
@@ -229,7 +226,7 @@ During a call, audio is recorded in 15-second intervals. Each chunk is processed
 ### Ending a Call
 To end a call, click the End Call button. The call termination signal is sent, and all media streams are closed. The final chunk (if any) is processed and added to the cumulative transcript.
 
-## API Endpoints
+## 📡 API Endpoints
 
 ### POST /saveRecording
 Description: Processes and saves the full call recording.
@@ -283,7 +280,7 @@ json
 }
 
 ```
-## Environment Variables
+## 🔑 Environment Variables
 
 Ensure the following environment variables are configured in your backend .env file:
 
