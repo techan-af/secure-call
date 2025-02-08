@@ -224,11 +224,13 @@ To end a call, click the End Call button. The call termination signal is sent, a
 Description: Processes and saves the full call recording.
 
 Request Body:
+
+```
 json
 {
   "cloudinaryUrl": "url_of_uploaded_recording"
 }
-
+```
 
 Response Example:
 
@@ -251,13 +253,17 @@ json
 Description: Processes a 15-second audio chunk.
 
 Request Body:
+
+```
 json
 {
   "cloudinaryUrl": "url_of_uploaded_chunk"
 }
 
-
+```
 Response Example:
+
+```
 json
 {
   "success": true,
@@ -265,11 +271,12 @@ json
   "refinedTranscript": "refined chunk transcription text"
 }
 
-
+```
 ## Environment Variables
 
 Ensure the following environment variables are configured in your backend .env file:
 
+```
 - PORT: The port on which the server runs (e.g., 5000)
 - MONGO_URI: MongoDB connection string
 - CLOUDINARY_UPLOAD_URL: URL for Cloudinary uploads
@@ -277,41 +284,9 @@ Ensure the following environment variables are configured in your backend .env f
 - GOOGLE_API_KEY: API key for Google Speech-to-Text
 - GEMINI_API_KEY: API key for Google Generative AI (Gemini AI)
 
-## Contributing
+```
 
-Contributions are welcome! If you wish to contribute to Secure Call, please follow these steps:
 
-1. Fork the Repository
-2. Create a Feature Branch:
-   bash
-   git checkout -b feature/YourFeature
-   
-3. Commit Your Changes:
-   bash
-   git commit -m "Add some feature"
-   
-4. Push to Your Branch:
-   bash
-   git push origin feature/YourFeature
-   
-5. Open a Pull Request:
-   Describe your changes and submit a pull request for review.
-
-For major changes, please open an issue first to discuss what you would like to change.
-
-## License
-
-This project is licensed under the MIT License. Feel free to use, modify, and distribute this software.
-
-## Acknowledgments
-
-- WebRTC & Socket.IO: For providing robust real-time communication capabilities
-- Cloudinary: For easy and reliable cloud storage solutions
-- Google Speech-to-Text & Gemini AI: For advanced audio transcription and text refinement capabilities
-- FFmpeg: For efficient audio conversion and processing
-- MongoDB: For flexible and scalable data storage
-
-## Disclaimer
 
 Secure Call is intended for educational and development purposes. Users must ensure compliance with applicable laws and regulations when deploying applications that handle real-time communication and personal data.
 
