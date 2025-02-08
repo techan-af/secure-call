@@ -96,6 +96,9 @@ The frontend, built with React, provides an intuitive interface featuring a bott
 6. *Data Persistence*
    - Call recordings, transcriptions, refined transcriptions, and scam analysis reports are saved in MongoDB
 
+
+---
+
 ## Project Structure
 
 SecureCall/
@@ -126,6 +129,8 @@ SecureCall/
 │
 └── README.md                         # Project documentation
 
+
+---
 
 ## Installation & Setup
 
