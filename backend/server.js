@@ -9,7 +9,7 @@ const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { analyzeCallRecording } = require("./suspicionAnalysis"); // Import your additional function if needed
+const { analyzeCallRecording } = require("./suspicionAnalysis"); // Your additional function
 
 // --- Gemini AI Pipeline Function ---
 async function processWithGeminiAI(transcription) {
@@ -23,6 +23,7 @@ async function processWithGeminiAI(transcription) {
     const prompt = `Try creating a meaningful sentence using both of these transcriptions that are en-US and en-IN:\n\nTranscription:\n${transcription}`;
     console.log("Generating refined text with Gemini AI...");
     const result = await model.generateContent(prompt);
+    // Adjust this if your API response differs.
     const refinedText = await result.response.text();
     console.log("Refined Text from Gemini AI:\n", refinedText);
 
@@ -158,6 +159,40 @@ setInterval(() => {
   }
 }, 10000); // every 10 seconds
 
+// --- Helper Function: Download & Convert Audio ---
+async function downloadAndConvertAudio(cloudinaryUrl, localWebmPath, localWavPath) {
+  // Download the WebM file from Cloudinary.
+  const writer = fs.createWriteStream(localWebmPath);
+  const response = await axios({
+    url: cloudinaryUrl,
+    method: "GET",
+    responseType: "stream",
+  });
+  response.data.pipe(writer);
+  await new Promise((resolve, reject) => {
+    writer.on("finish", resolve);
+    writer.on("error", reject);
+  });
+  console.log("Downloaded file from Cloudinary:", localWebmPath);
+
+  // Convert the downloaded file to WAV using ffmpeg.
+  await new Promise((resolve, reject) => {
+    ffmpeg(localWebmPath)
+      .toFormat("wav")
+      .audioChannels(1)
+      .audioFrequency(48000)
+      .on("end", () => {
+        console.log("Conversion to WAV completed:", localWavPath);
+        resolve();
+      })
+      .on("error", (err) => {
+        console.error("Error during conversion:", err);
+        reject(err);
+      })
+      .save(localWavPath);
+  });
+}
+
 // --- Endpoint to Process and Save Recording (Full Call) ---
 app.post("/saveRecording", async (req, res) => {
   try {
@@ -167,41 +202,17 @@ app.post("/saveRecording", async (req, res) => {
       return res.status(400).json({ error: "cloudinaryUrl is required" });
     }
 
+    // Create a new Recording document.
     let newRecording = new Recording({ url: cloudinaryUrl });
     await newRecording.save();
     console.log("Recording document created in MongoDB.");
 
     const localWebmPath = path.join(__dirname, "temp_input.webm");
     const localWavPath = path.join(__dirname, "output.wav");
-    const writer = fs.createWriteStream(localWebmPath);
-    const response = await axios({
-      url: cloudinaryUrl,
-      method: "GET",
-      responseType: "stream",
-    });
-    response.data.pipe(writer);
-    await new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
 
-    console.log("Downloaded WebM file from Cloudinary.");
-    await new Promise((resolve, reject) => {
-      ffmpeg(localWebmPath)
-        .toFormat("wav")
-        .audioChannels(1)
-        .audioFrequency(48000)
-        .on("end", () => {
-          console.log("Conversion to WAV completed.");
-          resolve();
-        })
-        .on("error", (err) => {
-          console.error("Error during conversion:", err);
-          reject(err);
-        })
-        .save(localWavPath);
-    });
+    await downloadAndConvertAudio(cloudinaryUrl, localWebmPath, localWavPath);
 
+    // Transcribe the full recording using Google Speech API.
     const GOOGLE_API_KEY = "AIzaSyBiIUJiunnW34aF5VLIIpEx1J_iKZRCvn0";
     const audioData = fs.readFileSync(localWavPath);
     const audioBase64 = audioData.toString("base64");
@@ -215,7 +226,6 @@ app.post("/saveRecording", async (req, res) => {
         config: { encoding: "LINEAR16", sampleRateHertz: 48000, languageCode: lang },
         audio: { content: audioBase64 },
       };
-
       try {
         const googleResponse = await axios.post(googleUrl, requestBody);
         const transcription = googleResponse.data.results
@@ -239,9 +249,17 @@ app.post("/saveRecording", async (req, res) => {
     newRecording.scamAnalysis = scamAnalysis;
     await newRecording.save();
 
-    // Clean up temporary files.
-    fs.unlinkSync(localWebmPath);
-    fs.unlinkSync(localWavPath);
+    // Clean up temporary files safely.
+    [localWebmPath, localWavPath].forEach((filePath) => {
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log("Deleted file:", filePath);
+        } catch (err) {
+          console.error("Error deleting file", filePath, err);
+        }
+      }
+    });
 
     console.log("Recording processing complete. Sending response.");
     res.json({ success: true, recording: newRecording });
@@ -262,34 +280,8 @@ app.post("/processChunk", async (req, res) => {
 
     const localWebmPath = path.join(__dirname, "temp_chunk.webm");
     const localWavPath = path.join(__dirname, "chunk_output.wav");
-    const writer = fs.createWriteStream(localWebmPath);
-    const response = await axios({
-      url: cloudinaryUrl,
-      method: "GET",
-      responseType: "stream",
-    });
-    response.data.pipe(writer);
-    await new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
-    console.log("Downloaded chunk WebM file from Cloudinary.");
 
-    await new Promise((resolve, reject) => {
-      ffmpeg(localWebmPath)
-        .toFormat("wav")
-        .audioChannels(1)
-        .audioFrequency(48000)
-        .on("end", () => {
-          console.log("Chunk conversion to WAV completed.");
-          resolve();
-        })
-        .on("error", (err) => {
-          console.error("Error during chunk conversion:", err);
-          reject(err);
-        })
-        .save(localWavPath);
-    });
+    await downloadAndConvertAudio(cloudinaryUrl, localWebmPath, localWavPath);
 
     const GOOGLE_API_KEY = "AIzaSyBiIUJiunnW34aF5VLIIpEx1J_iKZRCvn0";
     const audioData = fs.readFileSync(localWavPath);
@@ -304,7 +296,6 @@ app.post("/processChunk", async (req, res) => {
         config: { encoding: "LINEAR16", sampleRateHertz: 48000, languageCode: lang },
         audio: { content: audioBase64 },
       };
-
       try {
         const googleResponse = await axios.post(googleUrl, requestBody);
         const transcription = googleResponse.data.results
@@ -319,10 +310,20 @@ app.post("/processChunk", async (req, res) => {
     }
 
     console.log("Final Chunk Transcription:\n", fullTranscription.trim());
-    const refinedText = await processWithGeminiAI(fullTranscription.trim());
+    // For chunks, we only need the refined text.
+    const { refinedText } = await processWithGeminiAI(fullTranscription.trim());
 
-    fs.unlinkSync(localWebmPath);
-    fs.unlinkSync(localWavPath);
+    // Clean up temporary files safely.
+    [localWebmPath, localWavPath].forEach((filePath) => {
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log("Deleted file:", filePath);
+        } catch (err) {
+          console.error("Error deleting file", filePath, err);
+        }
+      }
+    });
 
     res.json({
       success: true,

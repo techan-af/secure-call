@@ -16,7 +16,7 @@ export default function Home() {
   const [onlineUsers, setOnlineUsers] = useState({});
   const [incomingCall, setIncomingCall] = useState(null);
   const [callActive, setCallActive] = useState(false);
-  // recordingData will accumulate transcripts from each chunk.
+  // recordingData will accumulate transcripts from each processed chunk.
   const [recordingData, setRecordingData] = useState({ transcription: "", refinedTranscription: "" });
   // isCaller indicates if this user initiated the call.
   const [isCaller, setIsCaller] = useState(false);
@@ -28,6 +28,8 @@ export default function Home() {
   const audioContext = useRef(null);
   const destination = useRef(null);
   const mediaRecorder = useRef(null);
+  // We'll store all chunks here to later upload the full recording.
+  const fullRecordingChunksRef = useRef([]);
 
   // Send heartbeat every 5 seconds.
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function Home() {
 
     socket.on("end-call", () => {
       console.log("Received end-call event from remote.");
-      endCall(false); // end without triggering upload if not caller.
+      endCall(false); // end without triggering full-recording upload if not caller.
     });
 
     // Receive ICE candidates from remote peers.
@@ -85,7 +87,7 @@ export default function Home() {
     };
   }, [userId, targetUser]);
 
-  // Function to process an audio chunk.
+  // Process an audio chunk: upload it to Cloudinary and send its URL to your backend.
   const processChunk = async (chunkBlob) => {
     console.log("Processing chunk...");
     const formData = new FormData();
@@ -123,13 +125,57 @@ export default function Home() {
     }
   };
 
+  // Upload the full recording to your backend's /saveRecording endpoint.
+  const saveFullRecording = async () => {
+    if (fullRecordingChunksRef.current.length === 0) {
+      console.error("No full recording data available.");
+      return;
+    }
+    const fullBlob = new Blob(fullRecordingChunksRef.current, { type: "audio/webm" });
+    // Reset the full recording chunks.
+    fullRecordingChunksRef.current = [];
+    console.log("Uploading full recording to Cloudinary...");
+    const formData = new FormData();
+    formData.append("file", fullBlob, `full-${userId}.webm`);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    try {
+      const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      console.log("Cloudinary response for full recording:", data);
+      if (data.secure_url) {
+        console.log("Sending full recording URL to backend for processing...");
+        const backendResponse = await fetch("http://localhost:5000/saveRecording", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
+        });
+        const backendData = await backendResponse.json();
+        if (backendData.success) {
+          console.log("Full recording processed and saved successfully:", backendData);
+        } else {
+          console.error("Backend full recording processing failed", backendData);
+        }
+      } else {
+        console.error("Full recording upload failed", data);
+      }
+    } catch (error) {
+      console.error("Error processing full recording:", error);
+    }
+  };
+
   // Start recording in 15-second chunks.
   const startRecording = () => {
     if (destination.current) {
+      // Reset the full recording chunks.
+      fullRecordingChunksRef.current = [];
       mediaRecorder.current = new MediaRecorder(destination.current.stream);
       mediaRecorder.current.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           processChunk(event.data);
+          fullRecordingChunksRef.current.push(event.data);
         }
       };
       // Start recording with a timeslice of 15000ms (15 seconds)
@@ -267,6 +313,12 @@ export default function Home() {
     }
     if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
       mediaRecorder.current.stop(); // Final chunk will be processed by ondataavailable.
+    }
+    if (triggerUpload) {
+      // Wait briefly to ensure the final chunk is processed.
+      setTimeout(() => {
+        saveFullRecording();
+      }, 1000);
     }
   };
 
