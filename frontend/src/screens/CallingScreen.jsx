@@ -147,7 +147,7 @@ export default function Home() {
       console.log("Cloudinary response for full recording:", data);
       if (data.secure_url) {
         console.log("Sending full recording URL to backend for processing...");
-        const backendResponse = await fetch("http://localhost:5000/saveRecording", {
+        const backendResponse = await fetch("https://secure-call.onrender.com/saveRecording", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cloudinaryUrl: data.secure_url }),
